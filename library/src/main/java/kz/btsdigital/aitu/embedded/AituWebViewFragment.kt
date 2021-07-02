@@ -19,6 +19,7 @@ import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
@@ -89,6 +90,7 @@ class AituWebViewFragment : Fragment() {
         webView.settings.domStorageEnabled = true
         webView.settings.allowContentAccess = false
         webView.settings.allowFileAccess = true
+        webView.webViewClient = WebViewClient()
         webView.setDownloadListener(getDownloadListener())
 
         webView.removeJavascriptInterface("aitu_embedded_bridge")
