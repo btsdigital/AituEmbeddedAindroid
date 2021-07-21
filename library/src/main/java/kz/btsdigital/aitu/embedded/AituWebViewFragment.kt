@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.Message
 import android.provider.Settings
 import android.util.Log
 import android.view.LayoutInflater
@@ -18,6 +19,7 @@ import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
@@ -91,6 +93,7 @@ class AituWebViewFragment : Fragment() {
         webView.settings.allowContentAccess = false
         webView.settings.allowFileAccess = true
         webView.webViewClient = WebViewClient()
+        webView.webChromeClient = getWebChromeClient()
         webView.setDownloadListener(getDownloadListener())
 
         webView.removeJavascriptInterface("aitu_embedded_bridge")
@@ -110,6 +113,31 @@ class AituWebViewFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         webView.removeJavascriptInterface("aitu_embedded_bridge")
+    }
+
+    private fun getWebChromeClient(): WebChromeClient = object : WebChromeClient() {
+        override fun onCreateWindow(
+            view: WebView?,
+            isDialog: Boolean,
+            isUserGesture: Boolean,
+            resultMsg: Message?,
+        ): Boolean {
+            val url = view?.hitTestResult?.extra ?: return false
+            val suffixes = listOf(
+                ".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm", ".mp3", ".pdf", ".rtf", ".txt",
+                ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".fb2", ".epub", ".zip", ".rar"
+            )
+            if (suffixes.any { url.endsWith(it) }) {
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW).setData(Uri.parse(url)))
+                    return true
+                } catch (e: Exception) {
+                    Toast.makeText(requireContext(), "Не удалось открыть Url = $url", Toast.LENGTH_SHORT).show()
+                    if (isDebug) Log.w(TAG, "Не удалось открыть Url = $url, $e")
+                }
+            }
+            return super.onCreateWindow(view, isDialog, isUserGesture, resultMsg)
+        }
     }
 
     private fun getDownloadListener(): DownloadListener = object : DownloadListener {
