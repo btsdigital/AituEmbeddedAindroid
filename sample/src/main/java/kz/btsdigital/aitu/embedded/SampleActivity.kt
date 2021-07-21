@@ -9,8 +9,7 @@ class SampleActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         val aituWebViewFragment = AituWebViewFragment.create(
-//            url = "https://aitu.io?theme=light&lang=ru",
-            url = "https://astanajs.kz/test-kundelik",
+            url = "https://kundelik.aitu.io?theme=light&lang=ru",
             authTokenProvider = { "fakeAuthToken" },
             isDebug = true
         )
