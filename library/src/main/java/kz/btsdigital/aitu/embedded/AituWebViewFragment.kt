@@ -30,7 +30,6 @@ import kz.btsdigital.aitu.embedded.internal.ContactPhoneBookProvider
 import kz.btsdigital.aitu.embedded.internal.PermissionDeniedException
 
 private const val EXTRA_URL = "EXTRA_URL"
-private const val EXTRA_IS_DEBUG = "EXTRA_IS_DEBUG"
 
 private const val DEFAULT_URL = "https://aitu.io/"
 
@@ -39,26 +38,19 @@ class AituWebViewFragment : Fragment() {
     companion object {
         private const val TAG = "AituWebViewFragment"
 
-        private var authTokenProvider: (() -> String)? = null
-
+        /**
+         * Перед созданием нужно настроить [AituBridgeSettings.setup]
+         */
         fun create(
             url: String,
-            authTokenProvider: (() -> String),
-            isDebug: Boolean = false,
-        ): AituWebViewFragment {
-            this.authTokenProvider = authTokenProvider
-
-            return AituWebViewFragment().apply {
-                arguments = Bundle().apply {
-                    putString(EXTRA_URL, url)
-                    putBoolean(EXTRA_IS_DEBUG, isDebug)
-                }
+        ) = AituWebViewFragment().apply {
+            arguments = Bundle().apply {
+                putString(EXTRA_URL, url)
             }
         }
     }
 
     private var url: String = DEFAULT_URL
-    private var isDebug: Boolean = false
 
     private val contactPhoneBookProvider by lazy { ContactPhoneBookProvider(requireContext()) }
 
@@ -74,7 +66,6 @@ class AituWebViewFragment : Fragment() {
         super.onCreate(savedInstanceState)
 
         url = arguments?.getString(EXTRA_URL, DEFAULT_URL) ?: DEFAULT_URL
-        isDebug = arguments?.getBoolean(EXTRA_IS_DEBUG, false) ?: false
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
@@ -85,7 +76,7 @@ class AituWebViewFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         webView = view.findViewById(R.id.webView)
 
-        WebView.setWebContentsDebuggingEnabled(isDebug)
+        WebView.setWebContentsDebuggingEnabled(AituBridgeSettings.settings.isDebug)
         webView.settings.javaScriptEnabled = true
         webView.settings.javaScriptCanOpenWindowsAutomatically = true
         webView.settings.setSupportMultipleWindows(true)
@@ -133,7 +124,7 @@ class AituWebViewFragment : Fragment() {
                     return true
                 } catch (e: Exception) {
                     Toast.makeText(requireContext(), "Не удалось открыть Url = $url", Toast.LENGTH_SHORT).show()
-                    if (isDebug) Log.w(TAG, "Не удалось открыть Url = $url, $e")
+                    if (AituBridgeSettings.settings.isDebug) Log.w(TAG, "Не удалось открыть Url = $url, $e")
                 }
             }
             return super.onCreateWindow(view, isDialog, isUserGesture, resultMsg)
@@ -148,7 +139,7 @@ class AituWebViewFragment : Fragment() {
             mimetype: String?,
             contentLength: Long,
         ) {
-            if (isDebug) Log.v(
+            if (AituBridgeSettings.settings.isDebug) Log.v(
                 TAG,
                 "onDownloadStart(url=$url, contentDisposition=$contentDisposition, mimeType=$mimetype)"
             )
@@ -184,15 +175,58 @@ class AituWebViewFragment : Fragment() {
     @JavascriptInterface
     fun getKundelikAuthToken(requestId: String) {
         val authToken = try {
-            authTokenProvider?.invoke()
+            AituBridgeSettings.settings.authTokenProvider?.invoke()
         } catch (e: Exception) {
             null
         }
         if (authToken.isNullOrEmpty()) {
-            postResult(requestId, Result.failure(Exception("AuthToken is nul or empty")))
+            postResult(requestId, Result.failure(Exception("AuthToken is null or empty")))
         } else {
             val tokenJson = """{"authToken": "$authToken"}"""
             postResult(requestId, Result.success(tokenJson))
+        }
+    }
+
+    @JavascriptInterface
+    fun getKundelikUserInfo(requestId: String) {
+        val userInfo = try {
+            AituBridgeSettings.settings.userInfoProvider?.invoke()
+        } catch (e: Exception) {
+            postResult(requestId, Result.failure(Exception("userInfo is null, ${e.message}")))
+            return
+        }
+        if (userInfo == null) {
+            postResult(requestId, Result.failure(Exception("userInfo is null")))
+            return
+        }
+
+        val json = """{
+                |"kundelikUserId": "${userInfo.userId}",
+                |"role" : "${userInfo.role}",
+                |"classId": ${if (userInfo.classId.isNullOrBlank()) "null" else "\"${userInfo.classId}\""}
+                |}""".trimMargin()
+        postResult(requestId, Result.success(json))
+    }
+
+    @JavascriptInterface
+    fun showNewMessengerEvent(requestId: String, `data`: String) {
+        // {"eventType":"new_message"}
+
+        val eventTypeRegex = Regex("\"eventType\"\\s*:\\s*\"(.*?)\"")
+        val findResult = eventTypeRegex.find(data) ?: run {
+            postResult(requestId, Result.failure(Exception("Illegal format, event_type not found")))
+            return
+        }
+
+        val event = when (findResult.groupValues[1]) {
+            "new_message" -> NewMessage
+            else -> UnknownEvent(type = findResult.groupValues[1])
+        }
+        try {
+            AituBridgeSettings.settings.showNewMessengerEvent?.invoke(event)
+            postResult(requestId, Result.success("\"OK\""))
+        } catch (e: Exception) {
+            postResult(requestId, Result.failure(Exception("error calling showNewMessengerEvent")))
         }
     }
 
@@ -206,7 +240,7 @@ class AituWebViewFragment : Fragment() {
             )
             // результат вернем в onResume
         } catch (e: Exception) {
-            if (isDebug) Log.w(TAG, "Не удалось открыть системные Настройки, $e")
+            if (AituBridgeSettings.settings.isDebug) Log.w(TAG, "Не удалось открыть системные Настройки, $e")
             postResult(requestId, Result.failure(Exception("Не удалось открыть системные Настройки")))
         }
     }
@@ -234,7 +268,7 @@ class AituWebViewFragment : Fragment() {
                 requireActivity().checkSelfPermission(READ_CONTACTS) == PackageManager.PERMISSION_GRANTED ->
                     onReadContactsPermissionGranted()
                 requireActivity().checkSelfPermission(READ_CONTACTS) == PackageManager.PERMISSION_DENIED ||
-                    requireActivity().shouldShowRequestPermissionRationale(READ_CONTACTS) ->
+                        requireActivity().shouldShowRequestPermissionRationale(READ_CONTACTS) ->
                     requestPermissionLauncher.launch(READ_CONTACTS)
                 else -> onReadContactsPermissionDenied()
             }
@@ -244,7 +278,7 @@ class AituWebViewFragment : Fragment() {
     private fun onReadContactsPermissionGranted() {
         val requestId = pendingContactsRequestId
         if (requestId.isNullOrBlank()) {
-            if (isDebug) Log.e(TAG, "Ошибка, pendingContactsRequestId пуст")
+            if (AituBridgeSettings.settings.isDebug) Log.e(TAG, "Ошибка, pendingContactsRequestId пуст")
             return
         }
         lifecycleScope.launchWhenResumed {
@@ -265,7 +299,7 @@ class AituWebViewFragment : Fragment() {
     private fun onReadContactsPermissionDenied() {
         val requestId = pendingContactsRequestId
         if (requestId.isNullOrBlank()) {
-            if (isDebug) Log.e(TAG, "Ошибка, pendingContactsRequestId пуст")
+            if (AituBridgeSettings.settings.isDebug) Log.e(TAG, "Ошибка, pendingContactsRequestId пуст")
             return
         }
         postResult(requestId, Result.failure(PermissionDeniedException()))
@@ -303,7 +337,7 @@ class AituWebViewFragment : Fragment() {
                         )
                         """.trimIndent()
             val js = "javascript:window.dispatchEvent($event)"
-            if (isDebug) Log.d(TAG, js)
+            if (AituBridgeSettings.settings.isDebug) Log.d(TAG, js)
             webView.evaluateJavascript(js, null)
         }
     }
