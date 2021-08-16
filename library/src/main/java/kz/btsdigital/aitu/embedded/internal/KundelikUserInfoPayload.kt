@@ -6,8 +6,8 @@ data class KundelikUserInfoPayload(
     val classId: String?,
 ) {
     companion object{
-        const val ROLE_RODITEL = "roditel"
-        const val ROLE_UCHITEL = "uchitel"
-        const val ROLE_UCHENIK = "uchenik"
+        const val ROLE_PARENT = "EduParent"
+        const val ROLE_STAFF = "EduStaff"
+        const val ROLE_STUDENT = "EduStudent"
     }
 }

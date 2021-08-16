@@ -18,7 +18,7 @@ class SampleActivity : AppCompatActivity() {
             userInfoProvider = {
                 KundelikUserInfoPayload(
                     userId = "fakeUserId",
-                    role = KundelikUserInfoPayload.ROLE_UCHITEL,
+                    role = KundelikUserInfoPayload.ROLE_STAFF,
                     classId = null
                 )
             }
