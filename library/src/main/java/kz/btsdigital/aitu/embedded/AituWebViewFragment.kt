@@ -292,7 +292,8 @@ class AituWebViewFragment : Fragment() {
                         |}""".trimMargin()
                 }
             }"
-            postResult(requestId, Result.success(contactsJson))
+            val fullContactsJson = """ { "contacts" : $contactsJson }"""
+            postResult(requestId, Result.success(fullContactsJson))
         }
     }
 
