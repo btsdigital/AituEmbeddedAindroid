@@ -22,6 +22,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
@@ -75,6 +76,11 @@ class AituWebViewFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         webView = view.findViewById(R.id.webView)
+
+        view.findViewById<TextView>(R.id.versionTextView).apply {
+            visibility = if (AituBridgeSettings.settings.isDebug) View.VISIBLE else View.GONE
+            text = BuildConfig.VERSION_NAME
+        }
 
         WebView.setWebContentsDebuggingEnabled(AituBridgeSettings.settings.isDebug)
         webView.settings.javaScriptEnabled = true

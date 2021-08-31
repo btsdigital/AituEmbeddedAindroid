@@ -3,6 +3,7 @@ plugins {
     id 'kotlin-android'
 }
 apply from: file('publish.gradle')
+def versionName = project.ext.find("version_name")
 
 android {
     compileSdkVersion 30
@@ -11,8 +12,7 @@ android {
     defaultConfig {
         minSdkVersion 21
         targetSdkVersion 30
-        versionCode 1
-        versionName "1.0"
+        buildConfigField 'String', 'VERSION_NAME', "\"${versionName}\""
     }
 
     buildTypes {
