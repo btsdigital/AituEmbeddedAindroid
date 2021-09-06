@@ -26,7 +26,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
 import kz.btsdigital.aitu.embedded.internal.ContactPhoneBookProvider
 import kz.btsdigital.aitu.embedded.internal.PermissionDeniedException
 
@@ -256,6 +255,18 @@ class AituWebViewFragment : Fragment() {
         pendingContactsRequestId = requestId
         checkReadContactsPermissions()
     }
+
+    @JavascriptInterface
+    fun getContactsVersion(requestId: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+            || requireActivity().checkSelfPermission(READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+        ) {
+            val contactsVersion = contactPhoneBookProvider.getPhoneBookContactsVersion()
+            postResult(requestId, Result.success("\"$contactsVersion\""))
+        } else {
+            postResult(requestId, Result.failure(PermissionDeniedException()))
+        }
+    }
     // endregion
 
     // region Permission
@@ -274,7 +285,7 @@ class AituWebViewFragment : Fragment() {
                 requireActivity().checkSelfPermission(READ_CONTACTS) == PackageManager.PERMISSION_GRANTED ->
                     onReadContactsPermissionGranted()
                 requireActivity().checkSelfPermission(READ_CONTACTS) == PackageManager.PERMISSION_DENIED ||
-                        requireActivity().shouldShowRequestPermissionRationale(READ_CONTACTS) ->
+                    requireActivity().shouldShowRequestPermissionRationale(READ_CONTACTS) ->
                     requestPermissionLauncher.launch(READ_CONTACTS)
                 else -> onReadContactsPermissionDenied()
             }
@@ -287,20 +298,18 @@ class AituWebViewFragment : Fragment() {
             if (AituBridgeSettings.settings.isDebug) Log.e(TAG, "Ошибка, pendingContactsRequestId пуст")
             return
         }
-        lifecycleScope.launchWhenResumed {
-            val contacts = contactPhoneBookProvider.getContacts()
-            val contactsJson = "${
-                contacts.map {
-                    """{
+        val contacts = contactPhoneBookProvider.getContacts()
+        val contactsJson = "${
+            contacts.map {
+                """{
                         |"first_name": "${it.firstName}", 
                         |"last_name": "${it.lastName}", 
                         |"phone": "${it.phoneNumber}"
                         |}""".trimMargin()
-                }
-            }"
-            val fullContactsJson = """ { "contacts" : $contactsJson }"""
-            postResult(requestId, Result.success(fullContactsJson))
-        }
+            }
+        }"
+        val fullContactsJson = """ { "contacts" : $contactsJson }"""
+        postResult(requestId, Result.success(fullContactsJson))
     }
 
     private fun onReadContactsPermissionDenied() {
