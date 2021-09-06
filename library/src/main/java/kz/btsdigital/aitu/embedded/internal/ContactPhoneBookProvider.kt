@@ -87,4 +87,26 @@ internal class ContactPhoneBookProvider(private val context: Context) {
         }
         return cachedContacts
     }
+
+    fun getPhoneBookContactsVersion(): String {
+        val versionCursor = context.contentResolver.query(
+            ContactsContract.RawContacts.CONTENT_URI,
+            arrayOf(ContactsContract.RawContacts.VERSION),
+            null,
+            null,
+            null
+        )
+
+        versionCursor?.use { cursor ->
+            if (!cursor.moveToFirst()) return ""
+            val currentVersion = StringBuilder()
+            do {
+                val versionColumnIndex = cursor.getColumnIndex(ContactsContract.RawContacts.VERSION)
+                currentVersion.append(cursor.getString(versionColumnIndex))
+            } while (cursor.moveToNext())
+
+            return currentVersion.toString()
+        }
+        return ""
+    }
 }
