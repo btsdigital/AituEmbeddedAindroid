@@ -262,7 +262,8 @@ class AituWebViewFragment : Fragment() {
             || requireActivity().checkSelfPermission(READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
         ) {
             val contactsVersion = contactPhoneBookProvider.getPhoneBookContactsVersion()
-            postResult(requestId, Result.success("\"$contactsVersion\""))
+            val contactsVersionHash = contactsVersion.hashCode()
+            postResult(requestId, Result.success("\"$contactsVersionHash\""))
         } else {
             postResult(requestId, Result.failure(PermissionDeniedException()))
         }
