@@ -2,7 +2,7 @@ apply plugin: 'maven-publish'
 
 def LIB_GROUP_ID = 'kz.btsdigital.aitu'
 def LIB_ARTIFACT_ID = 'embedded'
-def LIB_VERSION = "0.9"
+def LIB_VERSION = "0.10"
 
 project.ext.set("version_name", LIB_VERSION)
 
