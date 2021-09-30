@@ -34,8 +34,8 @@ class SampleActivity : AppCompatActivity() {
         }
 
         val aituWebViewFragment = AituWebViewFragment.create(
-            url = "https://astanajs.kz/test-kundelik",
-            // url = "https://kundelik.aitu.io?theme=light&lang=ru",
+//            url = "https://astanajs.kz/test-kundelik",
+            url = "https://kundelik.aitu.io?theme=light&lang=ru",
         )
         supportFragmentManager.beginTransaction()
             .replace(android.R.id.content, aituWebViewFragment)
