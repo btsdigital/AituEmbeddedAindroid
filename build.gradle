@@ -1,7 +1,7 @@
 buildscript {
 
     // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-stdlib
-    ext.kotlin_version = "1.5.30"
+    ext.kotlin_version = "1.5.31"
 
     repositories {
         google()

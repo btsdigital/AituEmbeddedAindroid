@@ -19,11 +19,13 @@ import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.JavascriptInterface
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import kz.btsdigital.aitu.embedded.internal.ContactPhoneBookProvider
@@ -59,6 +61,9 @@ class AituWebViewFragment : Fragment() {
 
     // Временная переменная для ожидания возврата в миниаппку после открытия системных настроек
     private var pendingSettingsRequestId: String? = null
+
+    // Временные переменные для ожидания выбора файла из внешнего хранилища
+    private var pendingChooseFilePathCallback: ValueCallback<Array<Uri>>? = null
 
     private lateinit var webView: WebView
 
@@ -134,6 +139,16 @@ class AituWebViewFragment : Fragment() {
             }
             return super.onCreateWindow(view, isDialog, isUserGesture, resultMsg)
         }
+
+        override fun onShowFileChooser(
+            webView: WebView?,
+            filePathCallback: ValueCallback<Array<Uri>>?,
+            fileChooserParams: FileChooserParams,
+        ): Boolean {
+            pendingChooseFilePathCallback = filePathCallback
+            chooseFileActivityLauncher.launch(fileChooserParams)
+            return true
+        }
     }
 
     private fun getDownloadListener(): DownloadListener = object : DownloadListener {
@@ -177,6 +192,7 @@ class AituWebViewFragment : Fragment() {
     }
 
     // region JavascriptInterface
+
     @JavascriptInterface
     fun getKundelikAuthToken(requestId: String) {
         val authToken = try {
@@ -270,27 +286,21 @@ class AituWebViewFragment : Fragment() {
     }
     // endregion
 
-    // region Permission
-    private val requestPermissionLauncher = registerForActivityResult(
+    // region Contact permission
+
+    private fun checkReadContactsPermissions() {
+        when {
+            isPermissionGranted(READ_CONTACTS) -> onReadContactsPermissionGranted()
+            shouldAskPermission(READ_CONTACTS) -> requestReadContactsPermissionLauncher.launch(READ_CONTACTS)
+            else -> onReadContactsPermissionDenied()
+        }
+    }
+
+    private val requestReadContactsPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) onReadContactsPermissionGranted()
         else onReadContactsPermissionDenied()
-    }
-
-    private fun checkReadContactsPermissions() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            onReadContactsPermissionGranted()
-        } else {
-            when {
-                requireActivity().checkSelfPermission(READ_CONTACTS) == PackageManager.PERMISSION_GRANTED ->
-                    onReadContactsPermissionGranted()
-                requireActivity().checkSelfPermission(READ_CONTACTS) == PackageManager.PERMISSION_DENIED ||
-                    requireActivity().shouldShowRequestPermissionRationale(READ_CONTACTS) ->
-                    requestPermissionLauncher.launch(READ_CONTACTS)
-                else -> onReadContactsPermissionDenied()
-            }
-        }
     }
 
     private fun onReadContactsPermissionGranted() {
@@ -321,6 +331,24 @@ class AituWebViewFragment : Fragment() {
         }
         postResult(requestId, Result.failure(PermissionDeniedException()))
     }
+    // endregion
+
+    // region Choose file
+
+    private val chooseFileActivityLauncher =
+        registerForActivityResult(
+            object : ActivityResultContract<WebChromeClient.FileChooserParams, Array<Uri>?>() {
+                override fun createIntent(context: Context, input: WebChromeClient.FileChooserParams): Intent =
+                    input.createIntent()
+
+                override fun parseResult(resultCode: Int, intent: Intent?): Array<Uri>? =
+                    WebChromeClient.FileChooserParams.parseResult(resultCode, intent)
+            }
+        )
+        { uris: Array<Uri>? ->
+            pendingChooseFilePathCallback?.onReceiveValue(uris)
+            pendingChooseFilePathCallback = null
+        }
     // endregion
 
     /**
@@ -359,3 +387,12 @@ class AituWebViewFragment : Fragment() {
         }
     }
 }
+
+private fun Fragment.isPermissionGranted(permission: String): Boolean =
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) true
+    else requireContext().checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+
+private fun Fragment.shouldAskPermission(permission: String): Boolean =
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) false
+    else requireContext().checkSelfPermission(permission) == PackageManager.PERMISSION_DENIED ||
+        requireActivity().shouldShowRequestPermissionRationale(permission)
